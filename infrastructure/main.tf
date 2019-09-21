@@ -14,16 +14,36 @@ resource "digitalocean_droplet" "ams3" {
   name     = "federation-ams3"
   image    = "ubuntu-18-04-x64"
   region   = "ams3"
-  size     = "512mb"
+  size     = "s-1vcpu-2gb"
   ssh_keys = [var.ssh_key_fingerprint]
+
+  provisioner "file" {
+    source      = "./scripts/install_minikube.sh"
+    destination = "/install/install_minikube.sh"
+
+    connection {
+      host    = "${digitalocean_droplet.ams3.ipv4_address}"
+      timeout = "10s"
+    }
+  }
 }
 
 resource "digitalocean_droplet" "lon1" {
   name     = "federation-lon1"
   image    = "ubuntu-18-04-x64"
   region   = "ams3"
-  size     = "512mb"
+  size     = "s-1vcpu-2gb"
   ssh_keys = [var.ssh_key_fingerprint]
+
+  provisioner "file" {
+    source      = "./scripts/install_minikube.sh"
+    destination = "/install/install_minikube.sh"
+
+    connection {
+      host    = "${digitalocean_droplet.lon1.ipv4_address}"
+      timeout = "10s"
+    }
+  }
 }
 
 output "ips" {
