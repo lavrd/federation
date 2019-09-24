@@ -17,14 +17,30 @@ resource "digitalocean_droplet" "ams3" {
   size     = "s-1vcpu-2gb"
   ssh_keys = [var.ssh_key_fingerprint]
 
+  connection {
+    user        = "root"
+    host        = "${digitalocean_droplet.ams3.ipv4_address}"
+    private_key = "${file("~/.ssh/id_rsa")}"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "cd /root",
+      "mkdir install",
+    ]
+  }
+
   provisioner "file" {
     source      = "./scripts/install_minikube.sh"
-    destination = "/install/install_minikube.sh"
+    destination = "/root/install/install_minikube.sh"
+  }
 
-    connection {
-      host    = "${digitalocean_droplet.ams3.ipv4_address}"
-      timeout = "10s"
-    }
+  provisioner "remote-exec" {
+    inline = [
+      "cd /root/install",
+      "chmod +x ./install_minikube.sh",
+      "./install_minikube.sh",
+    ]
   }
 }
 
@@ -35,14 +51,30 @@ resource "digitalocean_droplet" "lon1" {
   size     = "s-1vcpu-2gb"
   ssh_keys = [var.ssh_key_fingerprint]
 
+  connection {
+    user        = "root"
+    host        = "${digitalocean_droplet.lon1.ipv4_address}"
+    private_key = "${file("~/.ssh/id_rsa")}"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "cd /root",
+      "mkdir install",
+    ]
+  }
+
   provisioner "file" {
     source      = "./scripts/install_minikube.sh"
-    destination = "/install/install_minikube.sh"
+    destination = "/root/install/install_minikube.sh"
+  }
 
-    connection {
-      host    = "${digitalocean_droplet.lon1.ipv4_address}"
-      timeout = "10s"
-    }
+  provisioner "remote-exec" {
+    inline = [
+      "cd /root/install",
+      "chmod +x ./install_minikube.sh",
+      "./install_minikube.sh",
+    ]
   }
 }
 
