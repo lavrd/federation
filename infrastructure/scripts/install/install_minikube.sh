@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 
-# donwload minikube binary file
+# https://kubernetes.io/docs/tasks/tools/install-minikube/
+# https://kubernetes.io/docs/setup/learning-environment/minikube/
+
 curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 &&
   chmod +x minikube
 
-# move it to /usr/local/bin and delete
 install minikube /usr/local/bin
 rm ./minikube
 
-# clear previous minikube state
 minikube delete
 
-# start minikube with none driver (minikube runs by docker)
 minikube start --vm-driver=none
