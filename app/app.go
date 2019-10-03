@@ -1,8 +1,11 @@
 package main
 
 import (
+	"flag"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/arangodb/go-driver"
@@ -20,7 +23,15 @@ var arangodbUrl string
 var arangodbUser string
 var arangodbPass string
 
+// flags
+var httpPort = flag.String("http", ":7777", "set node http port")
+var neighborEndpoint = flag.String("neighbor", "http://127.0.0.1:8888", "set neighbor endpoint")
+var producer = flag.Bool("producer", false, "start node as a producer")
+var consumer = flag.Bool("consumer", false, "start node as a consumer")
+
 func init() {
+	flag.Parse()
+
 	log.Logger = log.
 		Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).
 		With().
@@ -49,6 +60,8 @@ func init() {
 }
 
 func main() {
+	log.Info().Msg("starting app")
+
 	// setup nats
 	natsConn, err := nats.Connect(natsUrl, nats.UserInfo(natsUser, natsPass))
 	if err != nil {
@@ -70,4 +83,22 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("initialize arangodb client error")
 	}
+
+	log.Info().Msg("dependencies initialized")
+
+	if *producer && *consumer {
+		log.Fatal().Msg("you cannot start node as a producer and as a consumer")
+	}
+
+	switch true {
+	case *producer:
+	case *consumer:
+	default:
+		log.Fatal().Msg("you need to specify node type (consumer or producer)")
+	}
+
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	<-interrupt
+	log.Info().Msg("handle SIGINT, SIGTERM, SIGQUIT")
 }
