@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -16,6 +17,9 @@ import (
 )
 
 const redisPingCmd = "PING"
+const redisPublishCmd = "PUBLISH"
+
+const redisTopicName = "PING"
 
 // envs
 var redisURL string
@@ -24,8 +28,8 @@ var arangodbUser string
 var arangodbPass string
 
 // flags
-var producer = flag.Bool("producer", false, "start node as a producer")
-var consumer = flag.Bool("consumer", false, "start node as a consumer")
+var startAsProducer = flag.Bool("producer", false, "start node as a producer")
+var startAsConsumer = flag.Bool("consumer", false, "start node as a consumer")
 
 func init() {
 	flag.Parse()
@@ -57,25 +61,25 @@ func main() {
 	log.Info().Msg("starting app")
 
 	// setup redis
-	redisConn, err := redis.DialURL(redisURL)
+	rconn, err := redis.DialURL(redisURL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("connect to redis error")
 	}
-	defer redisConn.Close()
+	defer rconn.Close()
 
-	if _, err := redisConn.Do(redisPingCmd); err != nil {
+	if _, err := rconn.Do(redisPingCmd); err != nil {
 		log.Fatal().Err(err).Msg("redis ping message error")
 	}
 
 	// setup arangodb
-	arangodbConn, err := http.NewConnection(http.ConnectionConfig{
+	aconn, err := http.NewConnection(http.ConnectionConfig{
 		Endpoints: []string{arangodbURL},
 	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("connect to arangodb error")
 	}
 	_, err = driver.NewClient(driver.ClientConfig{
-		Connection:     arangodbConn,
+		Connection:     aconn,
 		Authentication: driver.BasicAuthentication(arangodbUser, arangodbPass),
 	})
 	if err != nil {
@@ -84,13 +88,21 @@ func main() {
 
 	log.Info().Msg("dependencies initialized")
 
-	if *producer && *consumer {
+	if *startAsProducer && *startAsConsumer {
 		log.Fatal().Msg("you cannot start node as a producer and as a consumer")
 	}
 
 	switch true {
-	case *producer:
-	case *consumer:
+	case *startAsProducer:
+		go func() {
+			if err := runProducer(rconn); err != nil {
+				log.Fatal().Err(err).Msg("run producer error")
+			}
+		}()
+	case *startAsConsumer:
+		if err := runConsumer(rconn); err != nil {
+			log.Fatal().Err(err).Msg("run consumer error")
+		}
 	default:
 		log.Fatal().Msg("you need to specify node type (consumer or producer)")
 	}
@@ -99,4 +111,34 @@ func main() {
 	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	<-interrupt
 	log.Info().Msg("handle SIGINT, SIGTERM, SIGQUIT")
+}
+
+func runProducer(rconn redis.Conn) error {
+	for range time.NewTicker(time.Second).C {
+		_, err := rconn.Do(redisPublishCmd, redisTopicName, "value")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runConsumer(rconn redis.Conn) error {
+	rpsconn := redis.PubSubConn{Conn: rconn}
+
+	err := rpsconn.Subscribe(redisTopicName)
+	if err != nil {
+		return err
+	}
+
+	for {
+		switch recv := rpsconn.Receive().(type) {
+		case redis.Message:
+			fmt.Printf("%s: message: %s\n", recv.Channel, recv.Data)
+		case redis.Subscription:
+			fmt.Printf("%s: %s %d\n", recv.Channel, recv.Kind, recv.Count)
+		case error:
+			return recv
+		}
+	}
 }
