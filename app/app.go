@@ -10,22 +10,20 @@ import (
 
 	"github.com/arangodb/go-driver"
 	"github.com/arangodb/go-driver/http"
-	"github.com/nats-io/nats.go"
+	"github.com/gomodule/redigo/redis"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
+const redisPingCmd = "PING"
+
 // envs
-var natsUrl string
-var natsUser string
-var natsPass string
-var arangodbUrl string
+var redisURL string
+var arangodbURL string
 var arangodbUser string
 var arangodbPass string
 
 // flags
-var httpPort = flag.String("http", ":7777", "set node http port")
-var neighborEndpoint = flag.String("neighbor", "http://127.0.0.1:8888", "set neighbor endpoint")
 var producer = flag.Bool("producer", false, "start node as a producer")
 var consumer = flag.Bool("consumer", false, "start node as a consumer")
 
@@ -43,14 +41,10 @@ func init() {
 		splittedEnvPair := strings.Split(envPair, "=")
 		envKey, envVal := splittedEnvPair[0], splittedEnvPair[1]
 		switch envKey {
-		case "NATS_URL":
-			natsUrl = envVal
-		case "NATS_USER":
-			natsUser = envVal
-		case "NATS_PASS":
-			natsPass = envVal
+		case "REDIS_URL":
+			redisURL = envVal
 		case "ARANGODB_URL":
-			arangodbUrl = envVal
+			arangodbURL = envVal
 		case "ARANGODB_USER":
 			arangodbUser = envVal
 		case "ARANGODB_PASS":
@@ -62,22 +56,26 @@ func init() {
 func main() {
 	log.Info().Msg("starting app")
 
-	// setup nats
-	natsConn, err := nats.Connect(natsUrl, nats.UserInfo(natsUser, natsPass))
+	// setup redis
+	redisConn, err := redis.DialURL(redisURL)
 	if err != nil {
-		log.Fatal().Err(err).Msg("connect to nats error")
+		log.Fatal().Err(err).Msg("connect to redis error")
 	}
-	defer natsConn.Close()
+	defer redisConn.Close()
+
+	if _, err := redisConn.Do(redisPingCmd); err != nil {
+		log.Fatal().Err(err).Msg("redis ping message error")
+	}
 
 	// setup arangodb
-	conn, err := http.NewConnection(http.ConnectionConfig{
-		Endpoints: []string{arangodbUrl},
+	arangodbConn, err := http.NewConnection(http.ConnectionConfig{
+		Endpoints: []string{arangodbURL},
 	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("connect to arangodb error")
 	}
 	_, err = driver.NewClient(driver.ClientConfig{
-		Connection:     conn,
+		Connection:     arangodbConn,
 		Authentication: driver.BasicAuthentication(arangodbUser, arangodbPass),
 	})
 	if err != nil {
