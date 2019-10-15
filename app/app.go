@@ -34,6 +34,10 @@ var arangodbPass string
 var startAsProducer = flag.Bool("producer", false, "start node as a producer")
 var startAsConsumer = flag.Bool("consumer", false, "start node as a consumer")
 
+type Data struct {
+	Value string `json:"value"`
+}
+
 func init() {
 	flag.Parse()
 
@@ -117,8 +121,8 @@ func main() {
 }
 
 func runProducer(rconn redis.Conn) error {
-	for range time.NewTicker(time.Second).C {
-		_, err := rconn.Do(redisPublishCmd, redisTopicName, "value")
+	for i := range time.NewTicker(time.Second).C {
+		_, err := rconn.Do(redisPublishCmd, redisTopicName, i.String())
 		if err != nil {
 			return err
 		}
@@ -164,15 +168,16 @@ func runConsumer(rconn redis.Conn, aclient driver.Client) error {
 		return err
 	}
 
+	docMeta, err := col.CreateDocument(context.Background(), &Data{})
+	if err != nil {
+		return err
+	}
+
 	for {
 		switch recv := rpsconn.Receive().(type) {
 		case redis.Message:
 			log.Info().Msgf("`%s` ch received `%s`", recv.Channel, recv.Data)
-			_, err := col.CreateDocument(context.Background(), struct {
-				Data string `json:"data"`
-			}{
-				Data: string(recv.Data),
-			})
+			_, err := col.UpdateDocument(context.Background(), docMeta.Key, &Data{Value: string(recv.Data)})
 			if err != nil {
 				return err
 			}
