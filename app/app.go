@@ -1,8 +1,8 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -19,7 +19,10 @@ import (
 const redisPingCmd = "PING"
 const redisPublishCmd = "PUBLISH"
 
-const redisTopicName = "PING"
+const redisTopicName = "default"
+
+const arangodbDatabaseName = "default"
+const arangodbCollectionName = "default"
 
 // envs
 var redisURL string
@@ -78,7 +81,7 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("connect to arangodb error")
 	}
-	_, err = driver.NewClient(driver.ClientConfig{
+	aclient, err := driver.NewClient(driver.ClientConfig{
 		Connection:     aconn,
 		Authentication: driver.BasicAuthentication(arangodbUser, arangodbPass),
 	})
@@ -100,7 +103,7 @@ func main() {
 			}
 		}()
 	case *startAsConsumer:
-		if err := runConsumer(rconn); err != nil {
+		if err := runConsumer(rconn, aclient); err != nil {
 			log.Fatal().Err(err).Msg("run consumer error")
 		}
 	default:
@@ -123,7 +126,7 @@ func runProducer(rconn redis.Conn) error {
 	return nil
 }
 
-func runConsumer(rconn redis.Conn) error {
+func runConsumer(rconn redis.Conn, aclient driver.Client) error {
 	rpsconn := redis.PubSubConn{Conn: rconn}
 
 	err := rpsconn.Subscribe(redisTopicName)
@@ -131,12 +134,48 @@ func runConsumer(rconn redis.Conn) error {
 		return err
 	}
 
+	exists, err := aclient.DatabaseExists(context.Background(), arangodbDatabaseName)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		_, err := aclient.CreateDatabase(context.Background(), arangodbDatabaseName, nil)
+		if err != nil {
+			return err
+		}
+	}
+	db, err := aclient.Database(context.Background(), arangodbDatabaseName)
+	if err != nil {
+		return err
+	}
+
+	exists, err = db.CollectionExists(context.Background(), arangodbCollectionName)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		_, err := db.CreateCollection(context.Background(), arangodbCollectionName, nil)
+		if err != nil {
+			return err
+		}
+	}
+	col, err := db.Collection(context.Background(), arangodbCollectionName)
+	if err != nil {
+		return err
+	}
+
 	for {
 		switch recv := rpsconn.Receive().(type) {
 		case redis.Message:
-			fmt.Printf("%s: message: %s\n", recv.Channel, recv.Data)
-		case redis.Subscription:
-			fmt.Printf("%s: %s %d\n", recv.Channel, recv.Kind, recv.Count)
+			log.Info().Msgf("`%s` ch received `%s`", recv.Channel, recv.Data)
+			_, err := col.CreateDocument(context.Background(), struct {
+				Data string `json:"data"`
+			}{
+				Data: string(recv.Data),
+			})
+			if err != nil {
+				return err
+			}
 		case error:
 			return recv
 		}
