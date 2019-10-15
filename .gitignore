@@ -6,3 +6,6 @@ infrastructure/.env.tfvars
 infrastructure/.terraform
 infrastructure/terraform.tfstate
 infrastructure/terraform.tfstate.backup
+
+# kube
+infrastructure/kube/dashboard-secret
