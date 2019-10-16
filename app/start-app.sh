@@ -9,11 +9,18 @@ consumer)
     ARANGODB_URL=http://127.0.0.1:8529 ARANGODB_USER=root ARANGODB_PASS=arbuz \
     go run ./app.go -consumer
   ;;
+
 producer)
   REDIS_URL=redis://127.0.0.1:6379 \
     ARANGODB_URL=http://127.0.0.1:8529 ARANGODB_USER=root ARANGODB_PASS=arbuz \
     go run ./app.go -producer
   ;;
+
+validator)
+  ARANGODB_URL=http://127.0.0.1:8529 ARANGODB_USER=root ARANGODB_PASS=arbuz \
+    go run ./app.go -validator
+  ;;
+
 *)
   echo "starting app error: incorrect node type"
   ;;
