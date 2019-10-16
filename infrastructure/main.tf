@@ -37,15 +37,19 @@ resource "digitalocean_droplet" "ams3" {
 
   provisioner "remote-exec" {
     inline = [
-      "chmod +x /root/install/install_docker.sh",
-      "chmod +x /root/install/install_minikube.sh",
-      "/root/install/install_docker.sh",
-      "/root/install/install_minikube.sh"
+      "chmod +x /root/install/install-docker.sh",
+      "chmod +x /root/install/install-minikube.sh",
+      "/root/install/install-docker.sh",
+      "/root/install/install-minikube.sh"
     ]
   }
 
   provisioner "local-exec" {
-    command = "./scripts/prepare_remote_kube_access.sh ${digitalocean_droplet.ams3.ipv4_address}"
+    command = "./scripts/prepare-remote-kube-access.sh ${digitalocean_droplet.ams3.ipv4_address}"
+  }
+
+  provisioner "local-exec" {
+    command = "./scripts/prepare-kube-dashboard.sh"
   }
 }
 

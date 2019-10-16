@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+BASEDIR=$(dirname "$0")
+cd "$BASEDIR" || exit
+
 case "$1" in
 
 up)

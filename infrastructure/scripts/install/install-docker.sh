@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+BASEDIR=$(dirname "$0")
+cd "$BASEDIR" || exit
+
 # https://docs.docker.com/install/linux/docker-ce/ubuntu/
 
 apt-get update

@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+BASEDIR=$(dirname "$0")
+cd "$BASEDIR" || exit
+
 KUBE_DIR=$HOME/.kube
 VM_IP=$1
 
