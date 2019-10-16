@@ -45,11 +45,7 @@ resource "digitalocean_droplet" "ams3" {
   }
 
   provisioner "local-exec" {
-    command = "./scripts/prepare-remote-kube-access.sh ${digitalocean_droplet.ams3.ipv4_address}"
-  }
-
-  provisioner "local-exec" {
-    command = "./scripts/prepare-kube-dashboard.sh"
+    command = "./scripts/prepare-kube.sh ${digitalocean_droplet.ams3.ipv4_address}"
   }
 }
 
